@@ -258,8 +258,25 @@ std::vector<implementation> implementations =
 
 const int iterations = 10000;
 const int coeffs = 499;
+double MACs = iterations * (double)coeffs * (double)coeffs;
+
+void printInfo()
+{
+	if (sizeof(int*) == 4)
+		printf("Mode: 32b\n");
+	if (sizeof(int*) == 8)
+		printf("Mode: 64b\n");
+
+	printf("sizeof(sample) = %d, sizeof(longSample) = %d\n", (int)sizeof(sample), (int)sizeof(longSample));
+
+	printf("Iterations: %d\n", iterations);
+	printf("Coeffs:     %d\n", coeffs);
+	printf("MMACs:      %9.3f\n", MACs / 1e6);
+}
+
 int main()
 {
+		printInfo();
     	TestData t(coeffs);
 
     	for (auto& impl: implementations)
