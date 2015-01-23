@@ -1,5 +1,5 @@
-CXXFLAGS=-O3 -std=c++0x
-OBJS=main.o timediff.o implementations_generic.o
+CXXFLAGS=-O3 -std=c++0x -msse2 -mavx
+OBJS=main.o timediff.o implementations_generic.o implementations_avx.o
 TARGET=convTest
 
 
