@@ -22,52 +22,46 @@ static void mac_avx_unaligned(__m256d& sum, double*& dp, double*& cp)
     #define mac_avx mac_avx_mixed
 #endif
 
-static const int UNROLLS = 2;
+static const int UNROLLS = 4;
 
 
-longSample convolve_avx(sample* data, sample* coeffs, int len, int last_idx)
+double convolve_avx(double* data, double* coeffs, int len, int last_idx)
 {
     double a = 0.0;
-
-    int lmt = len - last_idx;
 
     double *dp = data + last_idx;
     double *cp = coeffs;
 
-    __m256d sum[UNROLLS];
+    int lmt = len - last_idx;
+
+    __m256d sums[UNROLLS];
 
     for (int i = 0; i < UNROLLS; ++i)
-    	sum[i] = _mm256_setzero_pd();
-    
+    	sums[i] = _mm256_setzero_pd();
+
     int cnt;
     for (cnt = lmt; cnt >= UNROLLS * 4; cnt -= UNROLLS * 4)
     {
     	for (int i = 0; i < UNROLLS; ++i)
-      		mac_avx_unaligned(sum[i], dp, cp);      //passed and returned by reference!
+      		mac_avx_unaligned(sums[i], dp, cp);      //passed and returned by reference!
     }
 
-   	while (cnt--)
-   	{
-   		a += *dp++ * *cp++;
-   	}
-    
+   	while (cnt--)	a += *dp++ * *cp++;
+
     dp = data;
     for (cnt = last_idx; cnt >= UNROLLS * 4; cnt -= UNROLLS * 4)
     {
       for (int i = 0; i < UNROLLS; ++i)
-      		mac_avx_unaligned(sum[i], dp, cp);      //passed and returned by reference!
+      		mac_avx_unaligned(sums[i], dp, cp);      //passed and returned by reference!
     }
-    
-    while (cnt--)
-   	{
-   		a += *dp++ * *cp++;
-   	}
-    
+
+    while (cnt--)	a += *dp++ * *cp++;
+
     double sse_sums[4] __attribute__ ((aligned (32)));      //aligned in the stack
 
     for (int i = 0; i < UNROLLS; ++i)
-   	{ 	
-    	_mm256_store_pd(sse_sums, sum[i]);
+   	{
+    	_mm256_store_pd(sse_sums, sums[i]);
     	a += sse_sums[0] + sse_sums[1] + sse_sums[2] + sse_sums[3];
     }
 

@@ -4,7 +4,7 @@
 
 static inline void mac_sse2_mixed(__m128d& sum, sample *__restrict__ &dp, sample *__restrict__ &cp)
 {
-  //__m128d d = _mm_lddqu_si128((const __m128i*)dp); dp += 2;    //data may be unaligned  
+  //__m128d d = _mm_lddqu_si128((const __m128i*)dp); dp += 2;    //data may be unaligned
   __m128d d = _mm_loadu_pd(dp); dp += 2;    //data may be unaligned
   __m128d c = _mm_load_pd(cp); cp += 2;     //coeffs should be aligned
   sum = _mm_add_pd(sum, _mm_mul_pd(c,d));
@@ -12,7 +12,7 @@ static inline void mac_sse2_mixed(__m128d& sum, sample *__restrict__ &dp, sample
 
 static inline void mac_sse2_unaligned(__m128d& sum, sample *__restrict__ &dp, sample *__restrict__ &cp)
 {
-   __m128d c = _mm_loadu_pd(cp); cp += 2;
+   __m128d  c = _mm_loadu_pd(cp); cp += 2;
     __m128d d = _mm_loadu_pd(dp); dp += 2;
     sum = _mm_add_pd(sum, _mm_mul_pd(c,d));
 }
@@ -26,59 +26,49 @@ static inline void mac_sse2_aligned(__m128d& sum, sample *__restrict__ &dp, samp
 
 #define mac_sse2 mac_sse2_unaligned
 
-static const int UNROLLS = 4;
+static const int UNROLLS = 1;
 
-longSample convolve_sse2(sample *__restrict__ data, sample *__restrict__ coeffs, int len, int last_idx)
+double convolve_sse2(double* data, double* coeffs, int len, int last_idx)
 {
-    sample a = 0;
+    double a = 0.0;
 
-    sample *dp = data + last_idx;
-    sample *cp = coeffs;
+    double *dp = data + last_idx;
+    double *cp = coeffs;
 
     int lmt = len - last_idx;
 
     __m128d sums[UNROLLS];
 
-    for (auto& s: sums)
-        s = _mm_setzero_pd();
+    for (int i = 0; i < UNROLLS; ++i)
+        sums[i] = _mm_setzero_pd();
 
     int cnt;
-    for (cnt = lmt; cnt >= UNROLLS*2; cnt -= UNROLLS*2)
+    for (cnt = lmt; cnt >= UNROLLS * 2; cnt -= UNROLLS * 2)
     {
-        for (auto& s: sums)
-            mac_sse2(s, dp, cp);		//passed and returned by reference!
+        for (int i = 0; i < UNROLLS; ++i)
+            mac_sse2(sums[i], dp, cp);		//passed and returned by reference!
     }
 
-    while (cnt--)
+    while (cnt--) a = *dp++ * *cp++;
+
+    dp = data;
+    for (cnt = last_idx; cnt >= UNROLLS * 2; cnt -= UNROLLS * 2)
     {
-        a = *dp++ * *cp++;
-    }
-    
-    //start from the start of the buffer
-    dp = data;    
-    //cp = coeffs + lmt;        
-    for (cnt = last_idx; cnt >= UNROLLS*2; cnt -= UNROLLS*2)
-    {
-        for (auto& s: sums)
-            mac_sse2(s, dp, cp);        //passed and returned by reference!
+      for (int i = 0; i < UNROLLS; ++i)
+          mac_sse2(sums[i], dp, cp);		//passed and returned by reference!
     }
 
-    //last iteration should include single access
-    while (cnt--)
-    {
-        a += *dp++ * *cp++;
-    }
-    
+    while (cnt--) a += *dp++ * *cp++;
+
     sample sse_sums[2] __attribute__ ((aligned (16)));      //aligned in the stack
 
-
-    for (auto& s: sums)
-    {
-        _mm_store_pd(sse_sums, s);
-        a += sse_sums[0] + sse_sums[1];
+    for (int i = 0; i < UNROLLS; ++i)
+   	{
+    	  _mm_store_pd(sse_sums, sums[i]);
+    	   a += sse_sums[0] + sse_sums[1];
     }
 
     return a;
 }
 
-RegisterImplementation rsse2_1("SSE2", convolve_sse2, 2, false, false);
+RegisterImplementation rsse2_1("SSE2", convolve_sse2, 2*UNROLLS, false, false);
